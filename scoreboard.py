@@ -6,7 +6,7 @@ class FunctionalUnit:
     def __init__(self, name, instructions, ex_time, Fi, Fj, Fk):
         self.name = name                    # name of functional unit (primarily for debugging)
         self.instructions = instructions    # list of instructions the FU can handle
-        self.instruction = None
+        self.instruction = None             # string with instruction currently in FU
         self.busy = False                   # bool that describes if FU is busy (initially False)
         self.ex_time = ex_time              # int that determines FU's default execute time
         self.time_left = ex_time            # counter that determines time left in execute
@@ -57,9 +57,9 @@ class Scoreboard:
         
         self.FU = []                # stores all of systems FU's
         self.instructions = []      # stores all incoming instructions
-        self.registers = {}         # stores registers and values
-        self.int_registers = {}
-        self.memory = {}
+        self.registers = {}         # stores FP registers and values
+        self.int_registers = {}     # stores integer registers and values
+        self.memory = {}            # stores memory values
         self.curr_registers = {}    # stores currently used registers
         self.inst_counter = 0       # stores count of instructions issued
         self.clk = 1                # clock
@@ -94,6 +94,8 @@ class Scoreboard:
                     off_loc = inst_arr[2].split('(')
                     loc = off_loc[1].replace(')', '')
                     off = off_loc[0]
+
+                    # handles store and load instructions
                     if inst_arr[0] == "L.D":
                         ii = instruction(inst_arr[0], inst_arr[1], loc, off)
                     else:
@@ -122,6 +124,7 @@ class Scoreboard:
         self.FU.append(div_fu)
         self.FU.append(int_fu)
 
+    # initialize the registers for the system
     def init_registers(self):
 
         self.registers = {'F0': 0, 'F1': 0, 'F2': 0, 'F3': 0, 'F4': 0, 'F5': 0, 'F6': 0, 'F7': 0,
@@ -142,9 +145,11 @@ class Scoreboard:
                         }
 
 
+    # checks if instruction can be issued
     def can_issue(self, curr_inst):
 
         for curr_fu in self.FU:
+            # RAR: if current instructions location is not already being written to 
             if curr_inst.location == curr_fu.Fi and curr_inst.inst not in curr_fu.instructions:
                 return False 
         
@@ -172,34 +177,38 @@ class Scoreboard:
             return False
         else:  
             for reg_fu in self.curr_registers:
-                # if a register in the instruction is currently being Written to 
-                # RAW
+                # RAW: if a register in the instruction is currently being Written to 
                 if (fu.Fj == reg_fu.Fi or fu.Fk == reg_fu.Fi) and fu.inst_counter > reg_fu.inst_counter:
                     print("cannot read, register being used")
                     return False 
             for reg_fu in self.FU:
                 if reg_fu not in self.curr_registers.values() and reg_fu.busy == True and (fu.Fj == reg_fu.Fi or fu.Fk == reg_fu.Fi):
                     return False
-
         
         return True
 
+    # Simulates read for FU
     def read(self, fu):
         
         self.curr_registers[fu] = fu
         fu.Read = False
         self.instructions[fu.inst_counter].read_op = self.clk
 
+    # checks if FU can execute, if read has already happened
     def can_execute(self, fu):
         
         return not fu.Read
 
+    # checks if FU can write
     def can_write(self, fu):
         
+        # if already executed...
         if not fu.Ex:
             for reg_fu in self.FU:
+
                 if fu.Fi == reg_fu.Fi and reg_fu.name != fu.name:
                     return True
+                # WAR: if location is being read in other FU and FU is not already read and instruction occurred before current instruction
                 if (fu.Fi == reg_fu.Fj or fu.Fi == reg_fu.Fk) and reg_fu not in self.curr_registers.values() and reg_fu.name != fu.name and reg_fu.inst_counter < fu.inst_counter:
                     print("cannot write, register being used")
                     return False 
