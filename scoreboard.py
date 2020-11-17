@@ -215,6 +215,7 @@ class Scoreboard:
 
         return not fu.Ex
 
+    # simulates write within the FU
     def write(self, fu):
        
         fu.Write = False
@@ -231,11 +232,15 @@ class Scoreboard:
         fu.Fk = None
         fu.instruction = None
 
+    # simulates execute within the FU
     def execute(self, fu):
         
+        # if execute is not complete then continue cycling
         if fu.Ex == True:
             fu.execute()
             print("Execute time left: ", fu.time_left)
+
+        # else simulate  instruction in registers
         if fu.time_left == 0:
             print('Execution Complete')
             self.execute_instruction(fu)
@@ -243,7 +248,10 @@ class Scoreboard:
             fu.time_left = fu.ex_time
             self.instructions[fu.inst_counter].execute = self.clk 
 
+    # does the arithmetic required by the instruction
     def execute_instruction(self, fu):
+
+        # Handles Load/Store
         if fu.name == "Integer":
             if fu.instruction == "L.D":
                 print("Loading memory ", fu.Fj, fu.Fk, " into location ", fu.Fi)
@@ -259,10 +267,12 @@ class Scoreboard:
                 mem_store = str(mem_loc + mem_offset) 
                 self.memory[mem_store] = self.registers[fu.Fj]
 
+        # Handles Multiplication
         elif fu.name == "Multiply":
             print("Storing result of multiplying ", fu.Fj, " and ", fu.Fk, " into ", fu.Fi)
             self.registers[fu.Fi] = self.registers[fu.Fj] * self.registers[fu.Fk]
       
+        # Handles Division
         elif fu.name == "Divide": 
             print("Storing result of dividing ", fu.Fj, " and ", fu.Fk, " into ", fu.Fi)
             try:
@@ -270,6 +280,7 @@ class Scoreboard:
             except Exception:
                 return
         
+        # Handles Addition/Subtraction
         else:
             if fu.instruction == "ADD.D":
                 print("Storing result of adding ", fu.Fj, " to ", fu.Fk, " into ", fu.Fi)
@@ -287,6 +298,7 @@ class Scoreboard:
                 print("Storing result of subtracting ", fu.Fj, " from ", fu.Fk, " into ", fu.Fi)
                 self.int_registers[fu.Fi] = self.int_registers[fu.Fj] - self.int_registers[fu.Fk]
 
+    # starts and runs the scoreboard
     def start(self):
         
         RAN_ALL_INSTRUCTIONS = False
@@ -294,12 +306,15 @@ class Scoreboard:
 
             print('\n\n\nCLOCK CYCLE: ', self.clk)
 
+            # sets current instruction if all instructions have not been completed
             if(self.inst_counter < len(self.instructions)):     
                 curr_inst = self.instructions[self.inst_counter]
             else:
                 RAN_ALL_INSTRUCTIONS = True
+
+            # Goes through every Functional Unit each clock cycle
             for fu in self.FU:
-                print('\nFunctional Unit: ', fu.name)
+
                 #checks if issue is allowed
                 if curr_inst.inst in fu.instructions and not fu.busy and not RAN_ALL_INSTRUCTIONS:
 
@@ -317,16 +332,20 @@ class Scoreboard:
                     can_execute = self.can_execute(fu)
                     can_write = self.can_write(fu)
                     
+                    # reads if appropriate
                     if can_read:
                         print(fu.name, "allowed to read")
                         self.read(fu)
-                    
+
+                    # executes if appropriate                   
                     elif can_execute and not can_write:
                         self.execute(fu)
 
+                    # writes if appropriate
                     elif can_write:
                         self.write(fu)
 
+            # updates registers after so that no other units have incorrect values
             for fu in self.FU:
                 if fu.Write == False:
                     self.finish_func(fu)
